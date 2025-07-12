@@ -12,9 +12,10 @@ import time
 import logging
 import requests
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
 from config import Config
+from channels import IFTTTChannel, TelegramChannel
 
 # Load environment variables
 load_dotenv()
@@ -41,13 +42,35 @@ class PressureMonitor:
         # Get environment variables
         env_vars = Config.get_environment_variables()
         self.api_key = env_vars['OPENWEATHER_API_KEY']
-        self.webhook_url = env_vars['IFTT_WEBHOOK_URL']
         self.coordinates = env_vars['COORDINATES']
         
         # Parse coordinates
         self.lat, self.lon = Config.parse_coordinates(self.coordinates)
         
+        # Initialize notification channels
+        self.notification_channels = self._initialize_channels()
+        
         logger.info(f"Pressure monitor initialized for coordinates: {self.lat}, {self.lon}")
+        logger.info(f"Enabled notification channels: {list(self.notification_channels.keys())}")
+    
+    def _initialize_channels(self) -> Dict[str, Any]:
+        """Initialize enabled notification channels."""
+        channels = {}
+        enabled_channels = Config.get_enabled_channels()
+        
+        for channel_name, config in enabled_channels.items():
+            try:
+                if channel_name == 'ifttt':
+                    channels[channel_name] = IFTTTChannel(config)
+                elif channel_name == 'telegram':
+                    channels[channel_name] = TelegramChannel(config)
+                else:
+                    logger.warning(f"Unknown notification channel: {channel_name}")
+            except Exception as e:
+                logger.error(f"Failed to initialize {channel_name} channel: {e}")
+        
+        logger.info(f"Initialized {len(channels)} notification channels")
+        return channels
     
     def hPa_to_mmHg(self, hPa: float) -> float:
         """Convert hectopascals to millimeters of mercury."""
@@ -87,7 +110,7 @@ class PressureMonitor:
             
             # Analyze next 24 hours (8 entries, 3-hour intervals)
             min_pressure_mmhg = current_pressure_mmhg
-            min_pressure_time = None
+            min_pressure_time = datetime.fromtimestamp(forecast_data['list'][0]['dt'])  # Default to current time
             
             for i, forecast in enumerate(forecast_data['list'][:Config.FORECAST_INTERVALS]):  # Next 24 hours
                 pressure_hpa = forecast['main']['pressure']
@@ -122,21 +145,26 @@ class PressureMonitor:
             logger.error(f"Error analyzing pressure data: {e}")
             return None
     
-    def trigger_webhook(self, pressure_data: Dict[str, Any]) -> bool:
-        """Trigger IFTT webhook with pressure alert data."""
-        try:
-            payload = Config.get_webhook_payload(pressure_data)
-            
-            logger.info("Triggering IFTT webhook...")
-            response = requests.post(self.webhook_url, json=payload, timeout=Config.WEBHOOK_TIMEOUT)
-            response.raise_for_status()
-            
-            logger.info("Webhook triggered successfully")
-            return True
-            
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to trigger webhook: {e}")
-            return False
+    def send_notifications(self, pressure_data: Dict[str, Any]) -> Dict[str, bool]:
+        """Send notifications to all enabled channels."""
+        results = {}
+        
+        for channel_name, channel in self.notification_channels.items():
+            try:
+                logger.info(f"Sending notification via {channel_name} channel...")
+                success = channel.send_notification(pressure_data)
+                results[channel_name] = success
+                
+                if success:
+                    logger.info(f"Notification sent successfully via {channel_name}")
+                else:
+                    logger.error(f"Failed to send notification via {channel_name}")
+                    
+            except Exception as e:
+                logger.error(f"Error sending notification via {channel_name}: {e}")
+                results[channel_name] = False
+        
+        return results
     
     def run(self) -> None:
         """Main execution method."""
@@ -155,11 +183,19 @@ class PressureMonitor:
             if pressure_alert:
                 logger.warning(f"PRESSURE ALERT: {pressure_alert['pressure_drop']:.1f} mmHg drop expected!")
                 
-                # Trigger webhook
-                if self.trigger_webhook(pressure_alert):
-                    logger.info("Pressure alert webhook sent successfully")
-                else:
-                    logger.error("Failed to send pressure alert webhook")
+                # Send notifications to all enabled channels
+                notification_results = self.send_notifications(pressure_alert)
+                
+                # Log results
+                successful_channels = [name for name, success in notification_results.items() if success]
+                failed_channels = [name for name, success in notification_results.items() if not success]
+                
+                if successful_channels:
+                    logger.info(f"Notifications sent successfully via: {', '.join(successful_channels)}")
+                
+                if failed_channels:
+                    logger.error(f"Failed to send notifications via: {', '.join(failed_channels)}")
+                    
             else:
                 logger.info("No pressure alert conditions met")
                 

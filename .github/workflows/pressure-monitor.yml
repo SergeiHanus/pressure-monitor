@@ -28,13 +28,15 @@ jobs:
       env:
         OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
         IFTT_WEBHOOK_URL: ${{ secrets.IFTT_WEBHOOK_URL }}
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         COORDINATES: ${{ secrets.COORDINATES }}
       run: |
         python pressure_monitor.py
     
     - name: Upload logs (if available)
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pressure-monitor-logs
         path: pressure_monitor.log

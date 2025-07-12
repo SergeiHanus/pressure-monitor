@@ -18,6 +18,11 @@ class Config:
     OPENWEATHER_UNITS = "metric"  # Use metric units for consistent pressure values
     API_TIMEOUT = 30  # seconds
     
+    # Telegram API settings
+    TELEGRAM_API_URL = "https://api.telegram.org/bot"
+    TELEGRAM_PARSE_MODE = "HTML"
+    TELEGRAM_DISABLE_WEB_PAGE_PREVIEW = True
+    
     # Retry settings
     MAX_RETRIES = 10
     RETRY_DELAY = 60  # seconds
@@ -37,12 +42,28 @@ class Config:
     # Unit conversion
     HPA_TO_MMHG_RATIO = 0.750062
     
+    # Notification channels configuration
+    NOTIFICATION_CHANNELS = {
+        'ifttt': {
+            'enabled': False,
+            'webhook_url': os.getenv('IFTT_WEBHOOK_URL'),
+            'timeout': 30  # seconds
+        },
+        'telegram': {
+            'enabled': True,
+            'bot_token': os.getenv('TELEGRAM_BOT_TOKEN'),
+            'chat_id': os.getenv('TELEGRAM_CHAT_ID'),
+            'parse_mode': os.getenv('TELEGRAM_PARSE_MODE', 'HTML'),
+            'disable_web_page_preview': True,
+            'timeout': 30  # seconds
+        }
+    }
+    
     @classmethod
     def get_environment_variables(cls) -> Dict[str, str]:
         """Get required environment variables."""
         return {
             'OPENWEATHER_API_KEY': os.getenv('OPENWEATHER_API_KEY'),
-            'IFTT_WEBHOOK_URL': os.getenv('IFTT_WEBHOOK_URL'),
             'COORDINATES': os.getenv('COORDINATES')
         }
     
@@ -54,6 +75,15 @@ class Config:
         
         if missing_vars:
             raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
+        
+        # Validate that at least one notification channel is enabled and configured
+        enabled_channels = []
+        for channel_name, config in cls.NOTIFICATION_CHANNELS.items():
+            if config.get('enabled', False):
+                enabled_channels.append(channel_name)
+        
+        if not enabled_channels:
+            raise ValueError("No notification channels are enabled. Please enable at least one channel in the configuration.")
     
     @classmethod
     def parse_coordinates(cls, coordinates: str) -> tuple[float, float]:
@@ -75,10 +105,20 @@ class Config:
         }
     
     @classmethod
-    def get_webhook_payload(cls, pressure_data: Dict[str, Any]) -> Dict[str, str]:
-        """Format webhook payload for IFTT."""
+    def get_enabled_channels(cls) -> Dict[str, Dict[str, Any]]:
+        """Get enabled notification channels."""
         return {
-            'value1': f"Pressure Alert: {pressure_data['pressure_drop']:.1f} mmHg drop expected",
-            'value2': f"Current: {pressure_data['current_pressure']:.1f} mmHg, Min: {pressure_data['min_pressure']:.1f} mmHg",
-            'value3': f"Expected at: {pressure_data['min_pressure_time'].strftime('%Y-%m-%d %H:%M')}"
-        } 
+            name: config for name, config in cls.NOTIFICATION_CHANNELS.items()
+            if config.get('enabled', False)
+        }
+    
+    @classmethod
+    def get_channel_config(cls, channel_name: str) -> Dict[str, Any]:
+        """Get configuration for a specific channel."""
+        return cls.NOTIFICATION_CHANNELS.get(channel_name, {})
+    
+    @classmethod
+    def is_channel_enabled(cls, channel_name: str) -> bool:
+        """Check if a specific channel is enabled."""
+        config = cls.get_channel_config(channel_name)
+        return config.get('enabled', False) 

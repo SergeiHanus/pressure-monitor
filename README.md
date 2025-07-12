@@ -17,9 +17,18 @@ A Python script that monitors weather pressure changes using the OpenWeather API
 
 Add the following secrets to your GitHub repository (Settings → Secrets and variables → Actions):
 
+#### Required Secrets:
 - `OPENWEATHER_API_KEY`: Your OpenWeather API key
-- `IFTT_WEBHOOK_URL`: Your IFTT webhook URL
 - `COORDINATES`: Location coordinates in format `lat,lon` (e.g., `40.7128,-74.0060`)
+
+#### Notification Channel Secrets:
+
+**IFTTT (Default):**
+- `IFTT_WEBHOOK_URL`: Your IFTT webhook URL
+
+**Telegram (Optional):**
+- `TELEGRAM_BOT_TOKEN`: Your Telegram bot token
+- `TELEGRAM_CHAT_ID`: Your Telegram chat ID
 
 ### 2. IFTT Webhook Setup
 
@@ -29,7 +38,66 @@ Add the following secrets to your GitHub repository (Settings → Secrets and va
    - `value2`: Current and minimum pressure values
    - `value3`: Expected time of minimum pressure
 
-### 3. OpenWeather API
+### 3. Telegram Bot Setup
+
+Follow these steps to set up Telegram notifications:
+
+#### Step 1: Create a Telegram Bot
+
+1. **Open Telegram** and search for `@BotFather`
+2. **Start a chat** with BotFather by clicking "Start"
+3. **Send the command**: `/newbot`
+4. **Follow the prompts**:
+   - Enter a name for your bot (e.g., "Pressure Monitor")
+   - Enter a username for your bot (must end with 'bot', e.g., "pressure_monitor_bot")
+5. **Save the bot token** that BotFather sends you (you'll need this for `TELEGRAM_BOT_TOKEN`)
+
+#### Step 2: Get Your Chat ID
+
+**Method 1: Using the Bot (Recommended)**
+1. **Search for your bot** by username in Telegram
+2. **Start a chat** with your bot by clicking "Start"
+3. **Send any message** to the bot (e.g., "Hello")
+4. **Visit this URL** in your browser (replace `YOUR_BOT_TOKEN` with your actual token):
+   ```
+   https://api.telegram.org/botYOUR_BOT_TOKEN/getUpdates
+   ```
+5. **Find your chat ID** in the response JSON (look for `"chat":{"id":123456789}`)
+6. **Save the chat ID** (you'll need this for `TELEGRAM_CHAT_ID`)
+
+**Method 2: Using @userinfobot**
+1. **Search for `@userinfobot`** in Telegram
+2. **Start a chat** with @userinfobot
+3. **Send any message** to get your chat ID
+4. **Note**: This gives you your personal chat ID, which you can use for direct messages
+
+#### Step 3: Test Your Bot
+
+1. **Send a test message** to your bot using this URL (replace with your details):
+   ```
+   https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage?chat_id=YOUR_CHAT_ID&text=Test message
+   ```
+2. **Check your Telegram** to see if you received the test message
+
+#### Step 4: Configure GitHub Secrets
+
+Add these secrets to your GitHub repository:
+- `TELEGRAM_BOT_TOKEN`: Your bot token from Step 1
+- `TELEGRAM_CHAT_ID`: Your chat ID from Step 2
+
+#### Step 5: Enable Telegram Notifications
+
+Edit `config.py` and enable Telegram:
+```python
+'telegram': {
+    'enabled': True,  # Change from False to True
+    'bot_token': os.getenv('TELEGRAM_BOT_TOKEN'),
+    'chat_id': os.getenv('TELEGRAM_CHAT_ID'),
+    'parse_mode': 'HTML'
+}
+```
+
+### 4. OpenWeather API
 
 1. Sign up at [OpenWeather](https://openweathermap.org/api)
 2. Get your API key from the dashboard
@@ -60,12 +128,44 @@ MAX_RETRIES = 10
 RETRY_DELAY = 60  # seconds
 ```
 
+### Notification Channels
+
+The system supports multiple notification channels that can be enabled/disabled in `config.py`:
+
+```python
+NOTIFICATION_CHANNELS = {
+    'ifttt': {
+        'enabled': True,  # Enable/disable IFTTT notifications
+        'webhook_url': os.getenv('IFTT_WEBHOOK_URL'),
+        'timeout': 30  # seconds
+    },
+    'telegram': {
+        'enabled': False,  # Enable/disable Telegram notifications
+        'bot_token': os.getenv('TELEGRAM_BOT_TOKEN'),
+        'chat_id': os.getenv('TELEGRAM_CHAT_ID'),
+        'parse_mode': os.getenv('TELEGRAM_PARSE_MODE', 'HTML'),
+        'disable_web_page_preview': True,
+        'timeout': 30  # seconds
+    }
+}
+```
+
+### Configuration Parameters
+
+All configuration parameters are centralized in `config.py`:
+
+- **API Settings**: URLs, timeouts, units
+- **Pressure Monitoring**: Threshold, forecast intervals
+- **Retry Logic**: Max retries, delay intervals
+- **Logging**: Level, format, file settings
+- **Channel Settings**: Timeouts, formatting options
+
 ### Other Configurable Parameters
 
 - **API Settings**: Timeout, units, URL
 - **Forecast Analysis**: Hours to analyze, intervals to check
 - **Logging**: Level, format, file name
-- **Webhook**: Timeout settings
+- **Channel Settings**: Timeouts, formatting options
 - **Unit Conversion**: hPa to mmHg ratio
 
 ## Local Testing
