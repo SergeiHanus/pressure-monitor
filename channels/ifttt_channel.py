@@ -2,11 +2,14 @@
 IFTTT notification channel implementation.
 """
 
+import logging
 import requests
 from typing import Dict, Any
 from datetime import datetime
 from .base_channel import BaseChannel
 from config import Config
+
+logger = logging.getLogger(__name__)
 
 class IFTTTChannel(BaseChannel):
     """IFTTT webhook notification channel."""

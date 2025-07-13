@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """
-Test script for Pressure Monitor webhook functionality
+Integration test script for Pressure Monitor webhook functionality
 
 This script mocks OpenWeather API responses to simulate pressure drop scenarios
 and test the webhook triggering functionality.
+
+Note: This file has been moved to tests/test_integration.py for better organization.
+Please use: python tests/test_integration.py or python run_tests.py
 """
 
 import os

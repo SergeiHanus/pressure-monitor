@@ -170,6 +170,8 @@ All configuration parameters are centralized in `config.py`:
 
 ## Local Testing
 
+### Basic Testing
+
 1. Install dependencies:
    ```bash
    pip install -r requirements.txt
@@ -180,12 +182,53 @@ All configuration parameters are centralized in `config.py`:
    OPENWEATHER_API_KEY=your_api_key_here
    IFTT_WEBHOOK_URL=your_webhook_url_here
    COORDINATES=40.7128,-74.0060
+   TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+   TELEGRAM_CHAT_ID=your_telegram_chat_id_here
    ```
 
 3. Run the script:
    ```bash
    python pressure_monitor.py
    ```
+
+### Comprehensive Test Suite
+
+Run the full test suite with unit tests for all components:
+
+```bash
+python tests/run_tests.py
+```
+
+This will run tests for:
+- Configuration validation
+- Pressure monitoring logic
+- Notification channels (IFTTT, Telegram)
+- Integration scenarios
+
+### Mock Scenario Testing
+
+Test specific webhook scenarios with mock data:
+
+```bash
+# Test pressure drop scenario (triggers notifications)
+python tests/run_test.py pressure_drop
+
+# Test no pressure drop scenario
+python tests/run_test.py no_drop
+
+# Test minimal pressure drop (below threshold)
+python tests/run_test.py minimal_drop
+```
+
+### Testing Individual Channels
+
+To test Telegram notifications specifically, ensure Telegram is enabled in `config.py` and run:
+
+```bash
+# Lower the threshold temporarily to trigger alerts
+# Edit config.py: PRESSURE_THRESHOLD_MMHG = -1
+python pressure_monitor.py
+```
 
 ## GitHub Actions
 
